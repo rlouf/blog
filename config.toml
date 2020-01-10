@@ -1,0 +1,14 @@
+BaseURL = "http://rlouf.github.com/"
+title = "/dev/null"
+languageCode = "en-us"
+theme="hugo-journal"
+AuthorName = "Remi Louf"
+
+
+[params]
+  logo = "img/dev_null.png"
+  description = ""
+  HomepagePosts = 99
+  githubUsername = "rlouf"
+  twitterUsername = "remilouf"
+  tagline = "Where all the wild thoughts are."
