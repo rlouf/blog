@@ -174,11 +174,158 @@ So the `LinearRegression` logpdf could be defined as:
 
 ```python
 class LinearRegression(Distribution):
-    def __init__(self, X):
-      self.X = X
+    def __call__(self, X):
+      weights, sigma, y = self.sample(X)
+      return y
 
-    def sample(self):
+    def sample(self, X):
       weights = Normal(0, 1).sample()
       sigma = Normal(0, 1).sample()
-      y = Normal(self.X * weights, sigma).sample
+      y = Normal(self.X * weights, sigma).sample()
+      return weights, sigma, y
+
+    def logpdf(self, X, weight, sigma, y):
+      logpdf = 0
+      logpdf += Normal(0 ,1).logpdf(weight)
+      logpdf += Normal(0, 1).logpdf(sigma)
+      logpdf += Normal(X * weight, sigma).logpdf(y)
+      return logpdf
+```
+
+So a slight modification of the distributions can make them equivalent:
+
+```python
+class Normal(distribution):
+  def __call__(self, mu, sigma):
+      return self.sample(mu, sigma)
+
+  def sample(self, mu, sigma):
+      return mu + random.norm() * sigma
+
+  def logpdf(self, x, mu, sigma):
+      return stats.logpdf(x, mu, sigma)
+```
+
+```python
+def normal(mu, sigma):
+  event_shape = ()
+  batch_shape = lax.broadcast_shape(mu, sigma)
+  domain = constraints.real
+
+  def sample(rng_key, sample_shape):
+    return mu + random.norm(rng_key, sample_shape) * sigma
+  
+  @limit_to(domain)
+  def logpdf(x):
+    return stats.norm(x, mu, sigma)
+```
+
+```python
+def linear_model(X):
+    def call(rng_key, sample_sample):
+      # something
+
+    def sample(rng_key, sample_shape):
+      w = normal(0, 1)[0](rng_key, sample_shape)
+      s = normal(0, 1)[0](rng_key, sample_shape)
+      y = normal(X*w)[0](rng_key)
+      return y
+
+    def logpdf(x, w, s, y):
+      logpdf = 0
+      logpdf += normal(0, 1)[1](w)
+      logpdf += normal(0, 1)[1](s)
+      logpdf += normal(X*w)[1](y)
+      return logpdf
+```
+
+So when I do
+
+```
+model = mcx.model(linear_regression)
+model(X) gives a random sample from distribution -> "call" = forward sampling
+model.sample(X, ...) gives an aribitrary number of samples from distribution
+model.logpdf(x, w, s, y) gives the logpdf
+```
+
+## The "return" is really only there to indicate which variables are interesting
+## during forward calls.
+
+before the model has been learned:
+
+```
+def forward(X):
+    w = normal(0, 1).sample()
+    s = normal(0, 1).sample()
+    return normal(x*w).sample()
+```
+
+
+Once the model has been learned:
+
+```
+def forward(X, trace):
+    w = empirical(trace['x']).sample()
+    s = empirical(trace['s']).sample()
+    return Normal(x*w).sample() <-- important to have the "return" !!!
+```
+
+```python
+sampler, logpdf = model(linear_regression)
+```
+
+
+```python
+class model():
+  def __init__(self, X):
+    self.X = x
+    print(sample(X))
+
+  def __call__(X):
+    w, s, y = self.sample_forward(X)
+    return y
+
+  def sample_forward():
+
+  def sample_posterior():
+
+  def logpdf():
+```
+
+```python
+Normal(0, 1)
+sample_normal(0, 1)
+```
+
+So a generative model can be transformed into a sample generating process as
+follows:
+
+```python
+def linear_model(X):
+    weights = Normal(0, 1)
+    sigma = Normal(0, 1) 
+    y = Normal(weights*x, sigma)
+    return y
+```
+
+Model as distribution?
+
+```python
+@as_distribution
+def HorseshoePrior(a):
+  return Normal(0, 1)
+
+def complicated_model(X):
+    a @ HorseshoePrior(0)
+    x @ Normal(a)
+    return x
+```
+
+`Model` inherits from distribution. When asking for model logpdf -> instantiates
+Model.
+
+Ok but how do we define a model?
+
+```
+model = model(complicated_model)  # telling it's a model
 ```

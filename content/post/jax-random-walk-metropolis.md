@@ -6,20 +6,30 @@ draft: false
 
 # TL;DR
 
-**JAX blows everyone out of the water**, by up to a factor of 20 in extreme
-cases (1,000 samples with 1,000,000 chains). Numpy wins in the small number of
-samples, small number of chains regime due to JAX's JIT compilation overhead. I
-report results for tensorflow probability (TFP), but keep in mind the comparison
-is unfair since its implementation of random walk metroplis includes more bells
-and whistles than ours.
+*Edit on 2020/10/01:* As pointed out by [Matthew
+Johnson](https://twitter.com/SingularMattrix) and [Hector
+Yee](https://twitter.com/eigenhector), the results reported in a previous
+version of this post were artificially biaised in favor of JAX due to my code
+not "advancing" the random number generator. I updated all curves and numbers,
+and added a little word of caution regarding the use of JAX's pseudo-random
+number generator.
+
+<!--**JAX blows everyone out of the water**, by up to a factor of 20 in extreme-->
+<!--cases (1,000 samples with 1,000,000 chains). Numpy wins in the small number of-->
+<!--samples, small number of chains regime due to JAX's JIT compilation overhead. I-->
+<!--report results for tensorflow probability (TFP), but keep in mind the comparison-->
+<!--is unfair since its implementation of random walk metroplis includes more bells-->
+<!--and whistles than ours.-->
 
 The code necessary to reproduce the results can be found
 [here](https://github.com/rlouf/blog-benchmark-rwmetropolis). Tips to make the
-code run faster are appreciated.
+code run faster are appreciated. I currently only care about getting the last
+sample of each chain; the number of iterations will eventually be dynamic and I
+want to avoid pre-allocating too much memory.
 
 # Vectorized MCMC
 
-Colin Carroll recently posted an interesting [blog
+Colin Carroll recently wrote an interesting [blog
 post](https://colindcarroll.com/2019/08/18/very-parallel-mcmc-sampling/) that
 uses Numpy and a vectorized version of the random walk metropolis algorithm
 (RWMH) to generate a large number of samples. Running multiple chains at
@@ -70,8 +80,7 @@ Before giving the results, a few words of caution:
    expect additional acceleration there.
 4. For Numpy and JAX the sampler is a generator and the samples are not kept in
    memory. This is not the case for TFP thus the computer runs out of memory
-   during big experiment. If TFP does not pre-allocate memory on the stack,
-   constantly having to allocate memory might also affect the performance.
+   during large experiments.
 5. Number of samples per second is not the metric that matters in probabilistic
    programming, but rather the number of effective samples you get per second.
    The latter is more of a matter of the algorithm you are using; this
@@ -127,7 +136,7 @@ def rw_metropolis_sampler(logpdf, initial_position):
 
 ## JAX
 
-The implementation in JAX is very similar to Numpy's:
+Let us unpack the JAX implementation. The kernel is very similar to Numpy's:
 
 ```python
 from functools import partial
@@ -135,36 +144,70 @@ from functools import partial
 import jax
 import jax.numpy as np
 
-@partial(jax.jit, static_argnums=(0, 1))
+@partial(jax.jit, static_argnums=(1,))
 def rw_metropolis_kernel(rng_key, logpdf, position, log_prob):
-    move_proposals = jax.random.normal(rng_key, shape=position.shape) * 0.1
+    key, subkey = jax.random.split(rng_key)
+    """Moves the chain by one step using the Random Walk Metropolis algorithm.
+  
+    Attributes
+    ----------
+    rng_key: jax.random.PRNGKey
+      Key for the pseudo random number generator.
+    logpdf: function
+      Returns the log-probability of the model given a position.
+    position: np.ndarray, shape (n_dims,)
+      The starting position.
+    log_prob: float
+      The log probability at the starting position.
+
+    Returns
+    -------
+    Tuple
+        The next positions of the chains along with their log probability.
+    """
+    move_proposals = jax.random.normal(key, shape=position.shape) * 0.1
     proposal = position + move_proposals
     proposal_log_prob = logpdf(proposal)
 
-    log_uniform = np.log(jax.random.uniform(rng_key, shape=position.shape))
+    log_uniform = np.log(jax.random.uniform(subkey))
     do_accept = log_uniform < proposal_log_prob - log_prob
 
     position = np.where(do_accept, proposal, position)
     log_prob = np.where(do_accept, proposal_log_prob, log_prob)
     return position, log_prob
-
-
-def rw_metropolis_sampler(rng_key, logpdf, initial_position):
-    position = initial_position
-    log_prob = logpdf(initial_position)
-    yield position
-
-    while True:
-        position, log_prob = rw_metropolis_kernel(rng_key, logpdf, position, log_prob)
-        yield position
 ```
+
+There are a few things to note here:
+1. `jax.numpy` acts as a drop-in replacement to `numpy`. For functions that only
+   involve array operations, replacing `import numpy as np` by `import jax.numpy
+   as np` should already give you performance benefits.
+2. We need to help JAX's compiler a little bit by indicating which arguments are
+   not going to change when the function is run several times:
+   `@partial(jax.jit, argnums=(1,))`. This is compulsory if you pass a
+   function as an argument, and can enable further compile-time optimizations.
+3. The kernel is written for a single chain. Keep reading for an explanation.
+
+Finally, and most importantly, JAX handles pseudo-random number generator in a
+very specific way and this can be tricky to grasp at first. Notice the line
+`key, subkey = jax.random.split(rng_key)`. What this line does is return the
+original key, and `subkey` which is original key "advanced" one step. **If you
+do not use `split` you will get a constant value instead of pseudo-random
+numbers.** Please do read the PRNG section in the [Gotcha man page](). I
+completely missed this in the previous version of this benchmark, and the
+performance that I reported where grossly optimistic.
+
+
+We will use `vmap` below to
+   vectorize the function. It allows a very neat conceptual separation: a
+   transition kernel advances a chain; it should be the rest of the code's
+   responsibility to make kernels run in parallel.
+
+The first thing to notice is that the function is written as if there only was a
+single chain.
 
 If you are familiar with Numpy, the syntax should feel very familiar to you.
 There are a few differences:
 
-1. `jax.numpy` acts as a drop-in replacement to `numpy`. For functions that only
-   involve array operations, replacing `import numpy as np` by `import jax.numpy
-   as np` should already give you performance benefits.
 2. JAX handle random number generation differently from other Python packages,
    for [very good
    reasons](https://github.com/google/jax/blob/master/design_notes/prng.md)
@@ -172,10 +215,6 @@ There are a few differences:
 3. I extracted the kernel from the sampler because JAX cannot compile
    generators (or can it?). So we extract and JIT the function that does all the
    heavy lifting: `rw_metropolis_kernel`.
-4. We need to help JAX's compiler a little bit by indicating which arguments are
-   not going to change when the function is run several times:
-   `@partial(jax.jit, argnums=(0, 1))`. This is compulsory if you pass a
-   function as an argument, and can enable further compile-time optimizations.
 
 
 ## Tensorflow Probability

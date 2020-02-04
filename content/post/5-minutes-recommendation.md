@@ -4,11 +4,13 @@ date: 2018-06-04T22:11:10+01:00
 draft: true
 ---
 
-I hate complex solutions. I really do. I don't know if this comes form my background in physics where
-simplicity is hailed as the greatest virtue, my background in philosophy of science, or my job as chief
-scientist in a small startup. I live by the mantra
+I hate complex solutions. I really do. I don't know if this comes form my
+background in physics where simplicity is hailed as the greatest virtue, my
+background in philosophy of science, or my job as chief scientist in a small
+startup. I live by the mantra
 
-> A simple model in production tomorrow is better than a deep learning solution in 6 months.
+> A simple model in production tomorrow is better than a deep learning solution
+> in 6 months.
 
 This might not apply if you work for a company that has the luxury to hire 100 data scientist (lucky you!),
 but it definitely applies to people working in a small startups. Just to give you some context about Sounds:

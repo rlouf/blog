@@ -1,12 +1,24 @@
 ---
-title: "AB tests: don't Dutch Book yourself"
+title: "AB tests: don't be your own Dutch Book"
 date: 2018-05-09T22:11:10+01:00
 draft: true
 ---
 
-The Dutch Book argument is one of Bayesian's favourite argument in favour of the theory. It basically says
-that if your decision framework respects the axioms of probability theory, no situation can make you bet
-against yourself.
+The (diachronic) Dutch Book argument is one possible justifications of the use
+of the axioms of probability and conditionalization when making decisions under
+uncertainty. In short, it shows that if you do not follow these rules in a
+situation where you are making a bet, a bookie will always be able to devise a
+betting sequence so that you end up betting against yourself and surely lose.
+
+In the context of A/B testing scenario, this implies that experiment after
+experiment, if you keep chosing the variant following the rules of probability
+and decision theory, no experiment scheme can make you decrease your overall
+utility with absolute certainty.
+
+But what happens exactly when you set up an experiment? Usually you choose with
+the product team a set of metrics to track, for instance estimated revenue,
+conversion or usage frequency.
+
 
 When I set up an experiment, I usually choose in accord with the product team a bunch of metrics to track.
 Some are estimated values (revenue), conversion (N-day retention) or frequencies (number of tracks shared). At
@@ -19,28 +31,34 @@ before, there were several problems with this approach:
 * Reaching significance\\(^{\text{TM}}\\) could take forever for low conversion rates (typically, revenue);
 * The decision process wasn't clear, and led to a lot of bargaining;
 
-We learned from this, and recognising that the problem was typically an application of decision theory, we
-started to define loss functions for each experiment. Applying existing models in sequential decision theory,
-we also had a consistent stopping rule that only depended on the loss, and the estimated cost of a day of
-experiment. That way, we could easily implement a platform that updated the results each day, and decided
-automatically to stop the experiments. The decision was easily made, and we usually performed exploratory
-analysis to disantangle the loss function and understand the effect of various variables, giving precious
-insights for product people. For instance, does the loss function increases because of revenue, or shares? If
-it is the latter, is it because people are more likely to share, or because people who do share more often?
+We learned from this, and recognising that the problem was typically an
+application of decision theory, we started to define loss functions for each
+experiment. Applying existing models in sequential decision theory, we also had
+a consistent stopping rule that only depended on the loss, and the estimated
+cost of a day of experiment. That way, we could easily implement a platform that
+updated the results each day, and decided automatically to stop the experiments.
+The decision was easily made, and we usually performed exploratory analysis to
+disantangle the loss function and understand the effect of various variables,
+giving precious insights for product people. For instance, does the loss
+function increases because of revenue, or shares? If it is the latter, is it
+because people are more likely to share, or because people who do share more
+often?
 
-It felt good, theoretically and pragmatically. At the beginning, it was hard to make decisions and come up
-with good loss functions. But these are decisions you have to make anyway, and it was better to lay them down
-mathematically. It really eased the discussions. It sped up the process, and allowed me to sleep at night: we
-did not control for false positives, but we were assured to make the best decisions possible given our
-constraints.
+It felt good, theoretically and pragmatically. At the beginning, it was hard to
+make decisions and come up with good loss functions. But these are decisions you
+have to make anyway, and it was better to lay them down mathematically. It
+really eased the discussions. It sped up the process, and allowed me to sleep at
+night: we did not control for false positives, but we were assured to make the
+best decisions possible given our constraints.
 
 Amazing, right? Except...
 
-If you change your loss function over time, you can expect that after  given sequence of choices that looked
-totally reasonable you are going to end up being worst off in terms of another `reasonable` loss function. The
-only way you can avoid betting yourself down if by being **consistant** over the decisions you make. You need
-to sit down and think about a single loss function that summarizes the company's goals. This has several
-advantages:
+If you change your loss function over time, you can expect that after  given
+sequence of choices that looked totally reasonable you are going to end up being
+worst off in terms of another `reasonable` loss function. The only way you can
+avoid betting yourself down if by being **consistant** over the decisions you
+make. You need to sit down and think about a single loss function that
+summarizes the company's goals. This has several advantages:
 
 1. You are assured to never choose an option that leaves you worse off according to the criterio you chose;
 2. This forces you to **sit down** with product owners and stakeholders to determined what exactly we are
