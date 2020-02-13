@@ -143,7 +143,7 @@ def nuts_integrator(rng_key, state: IntegratorState):
 We can now accomodate for many adaptive schemes for the step size and path
 length. Notice that the integrators are now only a function of a PRNG key and an
 integrator state; in other words they are also kernels. I saw yesterday that
-the developers [FunMC](https://arxiv.org/abs/2001.05035) use a similar approach.
+the developers of [FunMC](https://arxiv.org/abs/2001.05035) use a similar approach.
 
 The HMC kernel now looks like:
 
