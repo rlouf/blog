@@ -1,12 +1,13 @@
 ---
-title: "MCX: designing the API of the HMC kernel"
+title: "Designing modular inference engines: API for the HMC kernel"
 date: 2020-02-13T09:13:38+01:00
 draft: false
 ---
 
-I have been working on a probabilistic programming library, MCX (don't use it
-yet, most of it is in API prototype stage) for the past few weeks. I will write
-more about it soon, but the library is based on source code transformation: you
+I have been working on a probabilistic programming library,
+[MCX](https://github.com/rlouf/mcx) (don't use it yet, most of the inference
+engine is in API prototype stage) for the past few weeks. I will write more
+about it soon, but the library is based on source code transformation: you
 express the model as a python function, and a compiler reads the function,
 applies the necessary transformations and outputs either a function that
 generates samples from this distribution, or its logpdf. The logpdf can be
@@ -31,12 +32,16 @@ inside the rabbit hole.
 
 ## Hamiltonian Monte Carlo
 
-Hamiltonian Monte Carlo (HMC) methods are the cornerstone of most PPLs: Anglican,
-Numpyro, PyMC3, Pyro, Stan, Tensorflow Probability, Turing.jl, Rainier, Soss.jl,
-and many others I forgot (someone should write about the current Cambrian
-explosion of PPLs!) are all built around variants of Hamiltonian Monte Carlo. My
-first task when building MCX's inference engine was thus to implement the HMC
-kernel.
+Hamiltonian Monte Carlo (HMC) methods are the cornerstone of most PPLs:
+[Anglican](https://probprog.github.io/anglican/),
+[Numpyro](http://pyro.ai/numpyro/), [PyMC3](https://docs.pymc.io/),
+[Pyro](https://pyro.ai/), [Stan](https://mc-stan.org/), [Tensorflow
+Probability](https://www.tensorflow.org/probability),
+[Turing.jl](https://turing.ml/dev/), [Rainier](https://rainier.fit/),
+[Soss.jl](https://github.com/cscherrer/Soss.jl), and many others I forgot
+(someone should write about the current Cambrian explosion of PPLs!) are all
+built around variants of Hamiltonian Monte Carlo. If you don't already know why
+everyone is using HMC, have a look at [Betancourt's article](https://arxiv.org/abs/1410.5110) for a theoretical explanation. 
 
 The first expression I came up with was the following, which probably looks a
 lot like what you are used to. I use a closure to compose the different elements
@@ -104,7 +109,7 @@ There are, however, problems with this:
 
 1. What about empirical HMC, when path lengths are drawn from an empirical
    distribution?
-2. What about NUTS where path length is adaptively computed at each iteration?
+2. What about [NUTS](https://arxiv.org/abs/1111.4246) where path length is adaptively computed at each iteration?
 3. What about adaptive schemes for the step size?
 
 It is temptin to pass `step_size_generator` and `path_length_generator` to
@@ -137,7 +142,8 @@ def nuts_integrator(rng_key, state: IntegratorState):
 
 We can now accomodate for many adaptive schemes for the step size and path
 length. Notice that the integrators are now only a function of a PRNG key and an
-integrator state; in other words they are also kernels.
+integrator state; in other words they are also kernels. I saw yesterday that
+the developers [FunMC](https://arxiv.org/abs/2001.05035) use a similar approach.
 
 The HMC kernel now looks like:
 
@@ -181,8 +187,24 @@ brings a lot of benefits:
 - The logic of the kernel is more transparent;
 - The code is more modular; we can separate the implementations of the dynamics
   (momentum and kinetic energy) and trajectory integration. We are free to use
-  any symplectic integrator (2nd, 3rd, 4th order), use any metric (euclidean,
+  any symplectic integrator (2nd, 3rd, etc. order)[^symplectic], use any metric (euclidean,
   riemannian, etc.) and any variant in implementation. 
 - One can initialize a kernel with algorithms that are not in the library;
 - We can now free to use many adaptive schemes for the parameters of the
-  integrator. 
+  integrator.
+
+I am particularly excited at the perspective of having a module with inference
+engines decoupled to any particular PPL implementation. There is a lot of
+duplicated effort in the community (I am guilty of that too), and a central
+inference library would help in many ways:
+
+1. More pairs of eyes on the code; less bugs.
+2. People can focus on implementing different things rather than re-implementing
+   NUTS over and over again;
+3. More time could be allocated to more interesting problems: designing a flexible
+   interface, implementing BNNs, stochastic processes, etc.
+
+Wouldn't that be nice?
+
+[^symplectic]: I am particularly excited about being able to implement and use
+  algorithms mentioned in [this review paper](https://arxiv.org/abs/1711.05337).
