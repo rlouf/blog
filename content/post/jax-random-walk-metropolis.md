@@ -1,6 +1,6 @@
 ---
 title: "Massively parallel MCMC with JAX"
-date: 2019-01-09T13:19:11+01:00
+date: 2020-01-09T13:19:11+01:00
 draft: false
 ---
 
