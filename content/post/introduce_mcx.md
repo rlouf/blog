@@ -51,7 +51,7 @@ defining a new syntax and modify this syntax at runtime using Python's
 introspection abilities.
 
 
-```python
+```
 @mcx.model
 def beta_binomial():
   a <~ Beta(1, 2)
@@ -71,9 +71,7 @@ When you call either of these, two different **compilers** are called and
 traverse the graph to build the necessary functions.
 
 
-# Models are first and foremost generative functions
-
-## A tail of 4 distributions
+# A tale of 4 distributions 
 
 The duality between multivariate distribution and generative function usually
 implies the existence of 4 different distribution in PPLs. It is very important
@@ -108,33 +106,53 @@ models. Given input values and parameters they return other values that can be
 observed. While MCX models also represent a distribution, in the API we treat
 them first as generative functions.
 
+Consider the following linear regression model:
+
+```
+@mcx.model
+def linear_regression(x, lmba=1.):
+    scale <~ Exponential(lmbda)
+    coef <~ Normal(np.zeros(x.shape[-1]), 1)
+    y = np.dot(x, coef)
+    preds <~ Normal(y, scale)
+    return preds
+```
+
 Calling the generative function should return a different value each time it is
 called with a different value of `rng_key`:
 
+```
 >>> linear_regression(rng_key, x)
 2.3
+```
 
 Note the apparition of `rng_key` between the definition and the call here,
 necessary because of JAX's pseudo-random number generation system. It can be
 cumbersome to specify a different `rng_key` at each call so we can handle the
 splitting automatically using:
 
+```
 >>> fn = mcx.seed(linear_regression, rng_key)
 >>> fn(10)
 34.5
 >>> fn(10)
 52.1
+```
 
 `linear_regression` is a regular function so we can use JAX's vmap construct to
 obtain a fixed number of samples from the prior predictive distribution.
 
+```
 >>> keys = jax.random.split(rng_key, num_samples)
 >>> jax.vmap(linear_regression, in_axes=(0, None))(keys, x_data)
+```
 
 Again, for convenience, we provide a `sample_predictive` function, which draws
 samples from the function's generative distribution.
 
+```
 >>> mcx.sample_predictive(linear_regression, (x_data,), num_samples=1000)
+```
 
 **Interacting with the distribution**
 
@@ -143,18 +161,23 @@ model's random variables. We include utilities to sample from this distribution.
 To sample from the prior distribution, we implicitly assume the evaluator is the
 forward sampler and thus:
 
+```
 >>> sampler = mcx.sampler(rng_key, linear_regression, (x_data,))
 >>> samples = sampler.run(1000)
+```
 
 Since forward sampling can be an efficient way to debug a model, we also
 introduce a convenient `forward` method to the model:
 
+```
 >>> linear_regression.forward(rng_key, x_data)
+```
 
 To sample from the posterior distribution we need to specify which variables
 we are conditioning the distribution on (the observed variables) and the 
 kernel we use to sample from the posterior:
 
+```
 >>> sampler = mcx.sampler(
 ...               rng_key,
 ...               linear_regression, 
@@ -163,7 +186,7 @@ kernel we use to sample from the posterior:
 ...               HMC(100),
 ...           )
 ... sampler.run(1000)
-
+```
 
 **Posterior predictive**
 
@@ -171,16 +194,20 @@ Once the model's posterior distribution has been sampled we can define a new
 generative function that is the original function evaluated at the samples from
 the posterior distribution.
 
+```
 >>> evaluated_model = mcx.evaluate(linear_regression, trace)
+```
 
 When sampling from the predictive distribution, instead of drawing a value for
 each variable from its prior distribution, we sample one position of the chains
 and compute the function's output. Apart from this we can draw samples from
 the generative distribution like we would the model:
 
+```
 >>> evaluated_model(rng_key, x_data)
 >>> seeded = mcx.seed(evaluated_model, rng_key)
 >>> mcx.sample_predictive(seeded, (x_data,), num_samples=100)
+```
 
 Unlike the original model, however, the evaluated program is not a distribution.
 
@@ -223,7 +250,7 @@ Here were the requirements:
 
 
 
-# A Turing-complete language
+# 'Graph' as in Graphical model 
 
 The models' graph can be accessed interactively. It can be changed in place. It
 is possible to set the value of one node and see how it impacts the others, very
