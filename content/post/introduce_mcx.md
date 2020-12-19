@@ -6,8 +6,8 @@ draft: false
 
 # A simple API
 
-The difficulty of designing a user-friendly API for a Probabilistic Programming
-Language stems for the deceiving simplicity of the mathematical representation
+Designing a user-friendly API for a Probabilistic Programming
+Language (PPLs) is cursed by the deceiving simplicity of the mathematical representation
 of graphical models:
 
 ```
@@ -15,24 +15,48 @@ a ~ Beta(1, 2)
 b ~ Binomial(a)
 ```
 
-From this representation we need to extract at least two objects: one that
-produces samples form the prior distribution, and the multivariate
-log-probability density conditioned on the observe data. We have a one-to-many
+Why should it have to be harder than this? 
+
+
+Well. First, to manipulate these models in a useful way we need to extract at least two different representations of this object: one that
+draws samples form the prior joint distribution, and the
+log-probability density function. We have a one-to-many
 relationship between the notation and what we need from it in practice, and this
-one-to-many relationship does not have related constructs in programming
+one-to-many relationship is not trivial to implement in programming
 languages.
 
-Of course we can implement these two objects separately. This is actually what
-we do with "elementary" distributions like the Beta, Dirichlet, Multvariate
+Of course we can implement these two objects separately. This is simple to do with "elementary" distributions like the Beta, Dirichlet, Multivariate
 Normal, etc. distributions. In many PPLs they are implemented as a single object
-that implements the `sample` and `logpdf` distribution. This is however tedious
-with complex graphical models. But it should not be in the sense that these
-models are composed of elementary distibutions. We would like a language that
-allows us to write the combination of such elementary distributions and returns
+that implements the `sample` and `logpdf` functions. So you can implement distributions as classes so that when you write:
+
+```python
+x = Beta(1., 1.)
+```
+
+You can draw samples from the distribution
+
+`x.sample()`
+
+Or compute the log-probability as a point `a`:
+
+`x.logpdf(a)`
+
+The notation mirrors that of `x ~ Beta(1., 1.)`. But it becomes tedious
+with complex graphical models.
+
+Of course you could implement your model as a class with a `logpdf` and `sample` method, but it wouldn’t mirror the mathematical expression. Take the beta-binomial model above
+
+`a ~ Beta(1, 2)
+b ~ Binomial(a)`
+
+Shouldn’t we be able to express the fact that the model is the combination of two probability distribution? We would like a language that
+allows us to combine such elementary distributions, just like above, into an object that gives us
 its logpdf and sampling distribution.
 
-Programming language are different: one set of instructions does one thing and
-only one. There is thus a tension between the above notations and the
+But programming languages are different: one set of instructions does one thing and
+only one. I can probably write a programme like the one above that would give me predictive samples. But then I wouldn’t have the logpdf.
+
+There is thus a tension between the mathematical notations and the
 programming language. This is a problem of two languages: how do you express in
 a programming language an abstract concept?
 
@@ -50,8 +74,13 @@ construct. Having posed the problem in these terms there is only one solution:
 defining a new syntax and modify this syntax at runtime using Python's
 introspection abilities.
 
+Programming languages do not have a notion of random variable and the ability to reason about them.
 
-```
+# MCX models
+
+Here’s how you would express the beta-binomial model in MCX:
+
+```python
 @mcx.model
 def beta_binomial():
   a <~ Beta(1, 2)
@@ -60,7 +89,14 @@ def beta_binomial():
 ```
 
 which is syntactically correct python, but wouldn't do anything good without the
-`@mcx.model` decorator. What happens when you call the function is that its
+`@mcx.model` decorator. Notice the `<~` operator, which is not standard python notation. It stands for "random variable" assignment in MCX.
+
+What happens when you call this function? Under the hood MCX parses the content of your model into an intermediate representation, which is a mix between a graphical model (which is the mathematical object your model describes) and an abstract syntax tree (to maintain control flow). Random variables are identified as well as their distributions and the other variables they depend on.
+
+Models are funny objects. First, they are generative functions. If you call `beta_binomial` with a Prngkey it will return a sample from the predictive distribution. They are also distributions and implement `sample` that returns samples from the joint distribution implicitly defined, as well as `logpdf` which returns the logprobabiliy of points in the sample space.
+
+
+What happens when you call the function is that its
 content is being parsed: random variables and distributions are identified as
 well as their dependencies. And this is the second important thing: they are
 parsed into a directed graph, another representation of the equations above. The
@@ -79,32 +115,32 @@ to understand their difference when implementing the API.
 
 Those related to the model interpreted as a multivariate distribution:
 
-- The prior distribution is related to the multivariate distribution
-  interpretation. It is the distribution parametrized by the model's
-  random variables, given the model's parameters.
-- The posterior distribution is the multivariate distribution of the
-  model's parameters conditioned on the value of some of the model's
-  variables.
+- The prior distribution is related to the joint distribution interpretation. It is the distribution parametrized by the model's random variables, given the model's parameters.
+- The posterior distribution is the multivariate distribution of the model's parameters conditioned on the value of some of the model's variables.
 
-And those relatied to the model interpreted as a generative function:
+And those related to the model interpreted as a generative function:
 
-- The prior predictive distribution, which is the distribution of the
-  returned value of the model when the random variables' values are 
-  drawn from their prior distribution.
-- The posterior predictive distribution, which is the distribution of
-  the returned value assuming that the random variables' values are 
-  drawn from their posterior distribution.
+- The prior predictive distribution, which is the distribution of the returned value of the model when the random variables' values are  drawn from their prior distribution.
+- The posterior predictive distribution, which is the distribution of the returned value assuming that the random variables' values are drawn from their posterior distribution.
   
-In MCX it is assumed that both are predictive distributions of different
-objects: the model in the first case, the evaluated model in the second model.
+In MCX it is assumed that both are predictive distributions of different objects: the model in the first case, the evaluated model in the second model. To get prior predictive distribution:
+
+```python
+samples = mcx.sample_predictive(rng_key, model, args)
+```
+
+
 While the model is both a multivariate distribution and a generative function it
 can be evaluated. A generative function is only associated with a predictive
 distribution.
 
-Writing a model as a function is intuitive: most bayesian models are generative
-models. Given input values and parameters they return other values that can be
-observed. While MCX models also represent a distribution, in the API we treat
-them first as generative functions.
+```python
+model = mcx.evaluate(modeling, trace)
+samples = mcx.sample_predictive(rng_key, model, args)
+```
+
+Writing a model as a function is intuitive: most bayesian models are generative models. Given input values and parameters they return other values that can be
+observed. While MCX models also represent a distribution, in the API we treat them first as generative functions.
 
 Consider the following linear regression model:
 
@@ -212,58 +248,16 @@ the generative distribution like we would the model:
 Unlike the original model, however, the evaluated program is not a distribution.
 
 
-# Models are programs and samplers evaluators
-
-Evaluators are free to modify the graph to their liking. Hamiltonian Monte Carlo
-only performs well with random variables that have an unconstrained support. It
-may thus want to apply transformations to these variables so it is able to
-sample from their posterior.
-
-This allows other possibilities. When training bayesian neural networks, we may
-actually want to train the network with gradient descent while the
-inputs/outputs are random variables that can be sampled. We can thus imagine
-having evaluators that are mere optimizers. In this case it would change the
-neural network from a bayesian one to a regular neural network.
-
-When I started MCX in February my main goal was learning: learning Google's
-framework JAX and learn how to code a PPL. JAX looked appealing with its
-numpy-style API, no fuss jit-compilation, autodiff and vectorization. On the
-other hand, I had been using Stan and PyMC3 for years but did not have a good
-grasp of how inference was happening under the hood. And I have this default of
-not feeling comfortable using tools I do not fully understand.
-
-MCX was by no means intended to be a PPL at the time, more like Colin Carrol's
-[MiniMC]() but using JAX instead of Numpy.
-
-
-Here were the requirements:
-
-1. A simple API. We all love PyMC3's API. It has all what we need, and just what
-   we need. Except having to repeat the names of variables.
-2. A graph representation. Having a graph representation allows you to do a lot
-   of cool things: introspection and manipulation. And we call them *graphical
-   models*, after all?
-3. Fast inference, for many chains. What's worse than waiting in front of your
-   computer for hours to get samples. As for the chain, they are mostly cool
-   right now, but I have an idea of how to exploit many, many chains.
-4. Modularity.
-
-
-
 # 'Graph' as in Graphical model 
 
-The models' graph can be accessed interactively. It can be changed in place. It
-is possible to set the value of one node and see how it impacts the others, very
-useful to debug without re-writing the whole in scipy!
+The models' graph can be accessed interactively. It can be changed in place. It is possible to set the value of one node and see how it impacts the others, very useful to debug without re-writing the whole in scipy!
 
 ```
 new_graph = simplify_conjugacy(graph)
 ```
 
-Having a graph is wonderful: it means that you can symbolically manipulate your
-model. You can detect conjugacies and using conjugate distibution to optimize
-sampling, reparametrization is trivial to do, etc. Manipulating the graph is
-pretty much akin to manipulating the mathematical object.
+Having a graph is wonderful: it means that you can symbolically manipulate your model. You can detect conjugacies and using conjugate distibution to optimize
+sampling, reparametrization is trivial to do, etc. Manipulating the graph is pretty much akin to manipulating the mathematical object.
 
 
 ````
@@ -339,20 +333,3 @@ blocks or blocks you have programmed.
 
 MCX comes with sane defaults (runtimes and pre-defined programs), but has many
 trap doors that allow you to tinker with the lower level.
-
-### Carving MCMC at its joints
-
-In order to provide composable inference you need to tear existing algorithms
-apart, extract the specific from the general until you have independent pieces
-that work well together. This has two advantages:
-
-1. The biggest is development time. It is not rare to see a lot of duplicated
-   code in libraries that implement HMC and NUTS. In MCX it is "just" a matter
-   of creating program that replaces the HMC proposal with the NUTS proposal.
-   You can even add empirical HMC by replacing the proposal. Implementing
-   Riemannian HMC is just a matter of switching the metric and integrators. You
-   only need to write the parts that are specific to the algorithms.
-2. It allows advanced users to take all these parts and create a program you
-   would have never thought of.
-
-## Give me a million chains
