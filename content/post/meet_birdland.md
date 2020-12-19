@@ -5,7 +5,7 @@ draft: true
 ---
 
 This post is a long overdue post on a recommendation algorithm that I developed
-and implemented with colleagues in my previous job:
+and implemented with Etienne Duschene in my previous job:
 [Birdland](https://github.com/rlouf/birdland) (checkout the code on Github). I
 will explain the meat of the algorithm and what you can do with it. And most
 importantly, how we got there.
@@ -379,6 +379,21 @@ end up recommending popular songs.
 
 *Consensus:* Recommend the songs that have been listening to the largest number
 of users first. This is equivalent to the first scheme.
+
+*Trust:* Weigh each user by the number of times they have been visited. Weight
+each item by the weight of the user who recommend it it. Sum the item weights
+and sort them accordingly. This performs really well in practice, and what we
+ended up doing.
+
+*Relevance:* For each item visited, count the number of different items in my
+listening history that lead to it. Sort according to this number. This performs
+very well in practice too.
+
+
+### Birdland in practice
+
+We implemented Birdland in Go both for speed (the algorithm had to run online),
+and because the backend was in Go. 
 
 #### Recommending from walks.
 

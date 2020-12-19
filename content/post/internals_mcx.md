@@ -4,11 +4,17 @@ date: 2020-09-25T19:09:52+02:00
 draft: false
 ---
 
-# A simple API
+# A tale of two languages
 
+<<<<<<< HEAD:content/post/introduce_mcx.md
 Designing a user-friendly API for a Probabilistic Programming
 Language (PPLs) is cursed by the deceiving simplicity of the mathematical representation
 of graphical models:
+=======
+The difficulty of designing a user-friendly API for a Probabilistic Programming
+Language stems for the deceiving simplicity of the language we use to represent
+graphical models:
+>>>>>>> 426d9e7 (update, add grief):content/post/internals_mcx.md
 
 ```
 a ~ Beta(1, 2)
@@ -74,7 +80,11 @@ construct. Having posed the problem in these terms there is only one solution:
 defining a new syntax and modify this syntax at runtime using Python's
 introspection abilities.
 
+<<<<<<< HEAD:content/post/introduce_mcx.md
 Programming languages do not have a notion of random variable and the ability to reason about them.
+=======
+The Beta-Binomial model shown in mathematical notations above translates to:
+>>>>>>> 426d9e7 (update, add grief):content/post/internals_mcx.md
 
 # MCX models
 
@@ -82,11 +92,225 @@ Here’s how you would express the beta-binomial model in MCX:
 
 ```python
 @mcx.model
-def beta_binomial():
-  a <~ Beta(1, 2)
+def beta_binomial(beta=2):
+  a <~ Beta(1, beta)
   b <~ Binomial(a)
   return b
 ```
+
+Which is syntactically correct python but would not do anything good without the
+`@mcx.model` decorator.
+
+
+## Behind the scenes
+
+The modeling language was settled early on in the project. The internals have
+evolved a little since, and will keep evolving. What happens at the beggining
+is always the same: when initializing the model it is sent to a parser that
+reads the abstract syntax tree that converts the code into a graph.
+
+The first version consisted in registering transformations and distributions
+line by line, with a graph that contains constant nodes, transformation nodes
+and distributions. This graph would later be compiled into sampling functions or
+the logpdf.
+
+There were three main issues with this:
+
+1. It was impossible to use anything other than numbers and names to initialize
+   distribution. For instance, `Normal(np.ones(5), 1)` was forbidden. That was
+   because I did not parse the children of the nodes that define random
+   variables.
+2. There was a lot of custom AST re-writing, which is prone to errors. The less
+   I have to change python's code the better it is.
+3. When a model was called inside a model, the strategy was to merge recursively
+   the imported graphs into the current one. This can be problematic with
+   complex models.
+   
+For instance, here is the original implementation of `RandVar`
+```
+class RandVar(object):
+    def __init__(
+        self,
+        name: str,
+        distribution: Distribution,
+        args: Optional[List[Union[int, float]]],
+        is_returned: bool,
+    ):
+        self.name = name
+        self.distribution = distribution
+        self.args = args
+
+    def to_logpdf(self):
+        """Returns the AST corresponding to the expression
+        logpdf_{name} = {distribution}.logpdf_sum(*{arg_names})
+        """
+        return ast.Assign(
+            targets=[ast.Name(id=f"logpdf_{self.name}", ctx=ast.Store())],
+            value=ast.Call(
+                func=ast.Attribute(
+                    value=self.distribution,
+                    attr="logpdf_sum",
+                    ctx=ast.Load(),
+                ),
+                args=[ast.Name(id=self.name, ctx=ast.Load())],
+                keywords=[],
+            ),
+        )
+
+    def to_sampler(self, graph):
+        args = [ast.Name(id="rng_key", ctx=ast.Load())]
+
+        return ast.Assign(
+            targets=[ast.Name(id=self.name, ctx=ast.Store())],
+            value=ast.Call(
+                func=ast.Attribute(
+                    value=self.distribution,
+                    attr="forward",
+                    ctx=ast.Load(),
+                ),
+                args=args,
+                keywords=[],
+            ),
+        )
+```
+
+As you can see, a `RandVar` node carries its name, the name of the distribution
+as a string (e.g. "dist.Normal") and its args. It has two methods `to_logpdf`
+and `to_sampler` which are later called by the compiler depending on the
+context. Each node implements these methods, for instance for an argument:
+
+```
+class Argument(object):
+    def __init__(self, name: str, default: Optional[ast.expr] = None):
+        self.name = name
+        self.default_value = default
+
+    def to_logpdf(self):
+        return ast.arg(arg=self.name, annotation=None)
+
+    def to_sampler(self):
+        return ast.arg(arg=self.name, annotation=None)
+```
+
+There is a lot of AST writing that probably should not be happening. For
+instance, `dist.Normal(0, 1)` is something that will never be changed, why can't
+I transpose it directly from the original AST? I am not showing code from the
+compiler here (see [here](https://github.com/rlouf/mcx/blob/e906ee0d0b6c85269cafc0f6246afe6b15a3e7bb/mcx/compiler/compiler.py)) but it gets even messier).
+
+This did not feel either efficient, nor elegant, nor robust. Time for something
+else.
+
+My problems boiled down to two things:
+1. My graph representation was not granular enough, which led to problem (1)
+   above;
+2. I did not store the AST in a format that minimizes rewriting. Hence problem
+   (2);
+3. I used the compiler to do all the work instead of the graph, which made
+   problem (2) worse.
+   
+I took some inspiration from libraries that build symbolic graph, such as
+[Theano]() or [SymJAX](). To simplify, they have three kinds of nodes:
+
+1. Placeholders that represent the inputs to the graph who value is unknown when
+   the graph is built. For instance, in the beta-binomial example above the 
+   argument `beta` would be represented as a Placeholder.
+2. Constants, which represent numerical constants.
+3. Ops, which represent transformations from one node to the other. They can be
+   names (in which case they represent variables), or not. For instance, if
+   I parse `a = 2 * 3 + 4` I will have a first Op that represents the
+   multiplication of 2 by 3, and an Op named `a` that represents the sum
+   of the previous Op with 4.
+   
+What is intersting is that the AST can be easily translated into a graph like
+this. Take `a = 2 * 3 + 4` which python parses into the following AST:
+
+```
+Assign(
+  targets=[Name(id='a', ctx=Store())],
+  value=BinOp(
+    left=BinOp(
+          left=Constant(value=2, kind=None),
+          op=Mult(),
+          right=Constant(value=3, kind=None),
+    op=Add(),
+    right=Constant(value=4, kind=None))
+  )]
+```
+
+In MCX, we would first add the two constants $2$ and $3$ the graph as constants,
+then create an unnamed Op with a `to_ast` function defined as:
+
+```
+def to_ast(left, right):
+    return ast.Binop(left, ast.Mult(), right)
+```
+
+which is copied from the original ast. When we add this Op to the graph we
+specify the constants as its arguments, `graph.node(op, constant2, constant3)`.
+This function adds two edges between the constants and this op, and anotates the
+order of the arguments.
+
+Then we add an Op named "a" with the following `to_ast` function:
+
+```
+def to_ast(left, right):
+  return ast.Binop(left, ast.Add(), right)
+```
+
+And add to the graph specifying that the previous Op and the constant 4 are
+arguments. This is the simplified story. In reality the named Op is encountered
+first by the parser. What we do then is to recursively parse its arguments until
+we encounter a constant or a name and then add them to the graph backwards.
+While this may looks tedious, there are only 9 types of nodes that need to be
+handled during the recursion.
+
+Additionally, since we are building a PPL we would like to be able to reason
+about random variables and how they are connected to each other. So I add
+a `SampleOp` which is mostly syntactic sugar, except it also carries the
+distribution object.
+
+Compilation is fairly straightforwward: we need to traverse the graph in 
+topological order, and whenever a named Op is encountered compile it
+recursively. The only bits of AST that need to be added are the assignment
+statements and the function definition statement.
+
+How do we create the logpdf and samplers now? We create a new graph and
+manipulate it: add placeholder, change names, call methods on distributions
+and then compile this graph. As a result the compiler is kept fairly generic.
+Different functions share the sample core manipulations, and are specialized.
+
+We achieved most of what we wanted!
+1. There are less chances to do something wrong with the AST;
+2. The code is more generic;
+3. We can use any valid python expression as parameters of the distribution;
+
+And we can do more:
+1. Identify whether there is a direct link between two distributions. This
+   is important to identify conjugacies. Collapsing conjugacies is a matter
+   of traversing the graph to identify directly connected random variables,
+   check if there are conjugate and if so modify the graph.
+2. Identify whether a variable is a transformed random variable.
+
+
+
+
+The model is syntactically close to both the mathematical notation and that of a
+standard python function. When you write a MCX model such as the one above you
+implicitely define 2 distributions. First the joint probability distribution of
+the associated graphical model. You can sample from this distribution with the
+`mcx.sample_joint(beta_binomial)` function. You can also the log-probability for
+a set of values of is random variables with `mcx.log_prob(model)`.
+
+Second, the `return` statement of the function defines the model's `predictive
+distribution`. It is usually associated with prior predictive and posterior
+predictive sampling.
+
+Like any function, MCX model can be parametrized by passing arguments to the
+model. `beta_binomial` takes `beta` as an argument, which can
+later be used to parametrize the model.
+
+A MCX model is a generative function that implicitely defines a joint
+distribution on its random variables.
 
 which is syntactically correct python, but wouldn't do anything good without the
 `@mcx.model` decorator. Notice the `<~` operator, which is not standard python notation. It stands for "random variable" assignment in MCX.
@@ -101,10 +325,6 @@ content is being parsed: random variables and distributions are identified as
 well as their dependencies. And this is the second important thing: they are
 parsed into a directed graph, another representation of the equations above. The
 graph is stored in the model (which is actually a class).
-
-Models are distributions, so they implement `sample` and `logpdf` functions.
-When you call either of these, two different **compilers** are called and
-traverse the graph to build the necessary functions.
 
 
 # A tale of 4 distributions 
@@ -242,7 +462,7 @@ the generative distribution like we would the model:
 ```
 >>> evaluated_model(rng_key, x_data)
 >>> seeded = mcx.seed(evaluated_model, rng_key)
->>> mcx.sample_predictive(seeded, (x_data,), num_samples=100)
+>>> mcx.sample_predictive(rng_key, evaluate_model, (x_data,), num_samples=100)
 ```
 
 Unlike the original model, however, the evaluated program is not a distribution.

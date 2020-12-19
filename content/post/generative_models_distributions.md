@@ -16,8 +16,8 @@ probably should not exist:
   construct that is the idea of a random variable. This changes the behaviour
   of the language at runtime, behaviour which can be encoded in the intepreter
   or compiler.
-- Generative models are parametrizable functions: from data `\left{X\right}` and
-  parameters `\left(\alpha_i\right\)` they can generate values.
+- Generative models are parametrizable functions: from data $\left\{X\right\}$ and
+  parameters $\left(\alpha_i\right\)$ they can generate values.
 - They are not your regular kind of functions; as in standard Machine Learning,
   they can be learned from data.
 
@@ -63,7 +63,9 @@ random variable and the probability of its values are given by a Normal
 distribution parametrized by a zero mean and unit variance". So, really, the `~`
 symbol means `has` and not `is`. What `x` is, is potentially any number on its
 domain. It feels rather strange that we are ascribing the domain the the
-probability density function, but hey.
+probability density function, but hey. The distribution defines a measure that
+takes a single variable as an input. That variable that have several dimensions,
+e.g. multivariate normal.
 
 Now let us compare this with a simple model, a linear regression:
 
@@ -83,7 +85,7 @@ But if `linear_regression` is a function, what does it mean to write (and should
 it be valid)?
 
 ```python
-w ~ linear_regression(10)
+w ~ linear_regression(rng_key, 10)
 ```
 
 We can intuitively think that sampling values makes straightforward sense:

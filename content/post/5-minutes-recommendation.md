@@ -4,43 +4,6 @@ date: 2018-06-04T22:11:10+01:00
 draft: true
 ---
 
-I hate complex solutions. I really do. I don't know if this comes form my
-background in physics where simplicity is hailed as the greatest virtue, my
-background in philosophy of science, or my job as chief scientist in a small
-startup. I live by the mantra
-
-> A simple model in production tomorrow is better than a deep learning solution
-> in 6 months.
-
-This might not apply if you work for a company that has the luxury to hire 100 data scientist (lucky you!),
-but it definitely applies to people working in a small startups. Just to give you some context about Sounds:
-
-- Data is not the product. What we do mostly happens behind the scene: A/B testing, modeling of user
-  behaviours, ect. We are here in support of the product.
-- We move fast, very fast. We release on average once every week on iOS, and twice on Android. If it wasn't
-  for the logs I wouldn't be able to tell you what we did a month ago. Seriously.
-- The necessity to iterate crazy fast is because, despite a comfortable user base, we are still looking for
-  THE THING. And to find THE THING, sitting at a table making some drawings can only go so far. You need to
-  roll in production, and roll it NOW. Every day you're not releasing you're loosing time that could be used
-  testing new ideas. I call that experimental debt, and I'll probablyt write a couple of blog posts about that
-  soon.
-
-So when I was asked to devise a recommendation algorithm that is good enough to not deter users in less than a
-week. Well, I panicked. I'd prepared for that for months. I read about collaborative filtering, delved into
-the reasons why it may not be appropriate for music recommendation. Read about Poisson Factorization, and
-variational inference (even implemented it). Song2Vec, sequence learning, LDA. So on and so forth. But nothing
-prepared me to the CEO standing at the board on Monday and saying: "We're releasing this on Friday". 
-
-Now, the irony is that I'd been asking this question at interviews for the past 6 months. I found it was a
-great way to assess how pragmatic a data scientist can get, and how creative they get when resource is
-limited.
-
-My thought process was:
-
-- Fancy stuff is not going to make the cut. Assuming we're going with something I've already coded locally,
-  like PMF, it will require too much work on the backend, even if we join effots
-  with the backend.
-- OH MY GOD WHAT AM I GONNA DO?????
 
 Then sat down, reformulated the problem as a question (always do that!):
 
@@ -271,26 +234,26 @@ makes popular items to be more recommended, although they might not be the most 
 
 N'_ij = N_ij / N_j
 
-so \sum j \frac{N'}{N_i} = \frac{1/Ni} \sum_j \frac{N_ij}{N_j}
+so $$\sum j \frac{N'}{N_i} = \frac{1/Ni} \sum_j \frac{N_ij}{N_j}$$
 
-Instead we want K(i,j) such that:
+Instead we want $K(i,j)$ such that:
 
-\sum_i \frac{1}{|S|} K(i,j) = \frac{1}{|S|}
+$$\sum_i \frac{1}{|S|} K(i,j) = \frac{1}{|S|}$$
 
-K(i,j) = \frac{N_ij}{N_j} / \left( \sum_k \frac{N_ik/N_k} \right)
+$$K(i,j) = \frac{N_ij}{N_j} / \left( \sum_k \frac{N_ik/N_k} \right)$$
 
-\sum_i K(i,j) = 1
+$$\sum_i K(i,j) = 1$$
 
 
 ## Real implementation
 
 Starting from item $i$
 
-1. Choose user at random with probability 1/N_i
-2. Choose $k$ with probability \frac{1}{N_k} (1/\sum_n \frac{1}{N_n})
+1. Choose user at random with probability $1/N_i$
+2. Choose $k$ with probability $\frac{1}{N_k} (1/\sum_n \frac{1}{N_n})$
 
 So we can write:
 
-P(j|i) = \frac{1}{N_j} \sum_{p=1}^N_ij \mathcal{N}(p)
+$$P(j|i) = \frac{1}{N_j} \sum_{p=1}^N_ij \mathcal{N}(p)$$
 
 If we sum this over $i$

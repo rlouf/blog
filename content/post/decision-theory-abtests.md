@@ -6,6 +6,11 @@ draft: true
 
 ## A/B testing and existential angst
 
+$$\int_0^\infty f(x) dx$$
+
+$$ \begin{align} A & = B \\\\ & = C \end{align} $$
+
+
 You run A/B tests. Let me guess:
 
 You often found yourself anxious before product meetings, dreading the "are you
@@ -85,8 +90,8 @@ they willing to pay to get their answer quickly? Well, these are the questions
 we need to answer. These are the questions that **you** are responsible for
 asking. In short:
 
->> You can't pretend to be serious about your A/B tests if the decision process
->> is not part of the modeling.
+> You can't pretend to be serious about your A/B tests if the decision process
+> is not part of the modeling.
 
 This requires you to sit down with the product team and ask yourselves the
 following questions:
