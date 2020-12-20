@@ -4,6 +4,8 @@ date: 2020-02-13T09:13:38+01:00
 draft: false
 ---
 
+*Update (20/12/2020): MCX’s inference core is being moved to [BlackJAX](https://github.com/blackjax-devs/blackjax), a joint project with the Numpyro and PyMC devs.*
+
 I have been working on a probabilistic programming library,
 [MCX](https://github.com/rlouf/mcx) (don't use it yet, most of the inference
 engine is in API prototype stage) for the past few weeks. The library is based
