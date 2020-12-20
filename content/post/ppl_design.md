@@ -5,31 +5,32 @@ date: 2019-12-25T09:24:11+01:00
 draft: true
 ---
 
-Let me state two things:
+## Bayesian computations that scale?
 
-1. I am a Bayesian at heart. I have been using Bayesian methods professionally
-   for 5 years now;
-2. I do not claim to be an expert in the field, and there are a lot of people
-   smarter than me who have been thinking about these problems for a lot longer
-   than I have.
+Probabilistic programming, and its python incarnations, have made tremendous progress. While Machine Learning has always been content with the existing constructs of the language, probabilistic programming has struggled to push the boundaries of the programming language to get something as simple as a *function* to represent a model. But at last, we are getting there.
 
-A traditional program may look like this:
+What do we need?
 
-```python
-```
+1. The ability to write probabilistic programs as procedures, or at least as functions. These should be composable to create complex algorithms from simpler routines. This is the basics of machine learning. But it’s not ad obvious as it seems with probabilistic programming.
+2. Inference built on a framework that leverages modern hardware, at the very least parallel computations.
+3. Inference algorithms that scale. First that leverage modern hardware and its specificities.
+4. Principled algorithms that can handle out-of-memory datasets;
+5. Finally, a Bayesian promise that remains unfulfilled: the possibility to update one’s knowledge with new information.
+
+### Why would you want to make them scale?
+
+Aren’t Bayesian models best fitted to problems with small models, small data? True, they tremendously outperform "classical" methods in these areas. But
+
+- As Gelman rightly points out, and I think most practitioners can relate to that, big data always eventually becomes small due to the specific questions we’re asking;
+- Prior knowledge is great. Classical methods make assumptions that are often unstated. Bayesians have to be more honest about them.
+- Classical methods do not have a framework to make decisions, while it is embedded in Bayesian methods. The purpose of analysis is to make a decisions, in the end.
+- Bayesian updating.
+- More fine grained control over the specifics of the model.
 
 
-# Where there's improvement
 
-1. Make use of multi-core computations / GPU computation
-2. Bayesian knowledge updating
-3. Mini-batch updates
-
-
-```math
-P(\theta|\mathcal{D}_1) = \frac{\P(\mathcal{D}_1|\theta)
-P(\theta)}{P(\mathcal{D}_1} \propto P(\mathcal{D}_1|\theta)
-```
+\\[ P(\theta|\mathcal{D}_1) = \frac{P(\mathcal{D}_1|\theta)
+P(\theta)}{P(\mathcal{D}_1} \propto P(\mathcal{D}_1|\theta) \\]
 
 Much of the practical & theoretical debate has been focusing on the choice of
 priors, which for me is a *non-debate*. Traditional ML does have priors, but
