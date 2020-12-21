@@ -1,20 +1,14 @@
 ---
-title: "Introducing MCX"
+title: "Designing MCX's core"
 date: 2020-09-25T19:09:52+02:00
 draft: false
 ---
 
 # A tale of two languages
 
-<<<<<<< HEAD:content/post/introduce_mcx.md
-Designing a user-friendly API for a Probabilistic Programming
-Language (PPLs) is cursed by the deceiving simplicity of the mathematical representation
-of graphical models:
-=======
 The difficulty of designing a user-friendly API for a Probabilistic Programming
 Language stems for the deceiving simplicity of the language we use to represent
 graphical models:
->>>>>>> 426d9e7 (update, add grief):content/post/internals_mcx.md
 
 ```
 a ~ Beta(1, 2)
