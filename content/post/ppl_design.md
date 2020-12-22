@@ -25,7 +25,7 @@ Aren’t Bayesian models best fitted to problems with small models, small data? 
 - Prior knowledge is great. Classical methods make assumptions that are often unstated. Bayesians have to be more honest about them.
 - Classical methods do not have a framework to make decisions, while it is embedded in Bayesian methods. The purpose of analysis is to make a decisions, in the end.
 - Bayesian updating.
-- More fine grained control over the specifics of the model.
+- To me the most important thing along Bayesian Decision Theory: more fine-grained control over the specifics of the model.
 
 
 
